@@ -4,7 +4,6 @@
 
 module Storage.Queries.SearchTry (module Storage.Queries.SearchTry, module ReExport) where
 
-import qualified Domain.Types.AddOnConfig
 import qualified Domain.Types.SearchTry
 import Kernel.Beam.Functions
 import Kernel.External.Encryption
@@ -46,6 +45,7 @@ updateByPrimaryKey (Domain.Types.SearchTry.SearchTry {..}) = do
       Se.Set Beam.currency (Kernel.Prelude.Just currency),
       Se.Set Beam.customerExtraFee (Kernel.Prelude.roundToIntegral <$> customerExtraFee),
       Se.Set Beam.customerExtraFeeAmount customerExtraFee,
+      Se.Set Beam.discountAmount discountAmount,
       Se.Set Beam.driverPreference driverPreference,
       Se.Set Beam.emailDomain emailDomain,
       Se.Set Beam.estimateId estimateId,
@@ -57,6 +57,7 @@ updateByPrimaryKey (Domain.Types.SearchTry.SearchTry {..}) = do
       Se.Set Beam.messageId messageId,
       Se.Set Beam.negativeFareAdjustment (Kernel.Prelude.roundToIntegral <$> negativeFareAdjustment),
       Se.Set Beam.negativeFareAdjustmentAmount negativeFareAdjustment,
+      Se.Set Beam.paymentChargeDetails (toJSON <$> paymentChargeDetails),
       Se.Set Beam.paymentInstrument paymentInstrument,
       Se.Set Beam.petCharges (Kernel.Prelude.roundToIntegral <$> petCharges),
       Se.Set Beam.petChargesAmount petCharges,

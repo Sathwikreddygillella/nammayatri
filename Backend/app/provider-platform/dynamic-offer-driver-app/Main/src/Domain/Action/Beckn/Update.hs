@@ -17,6 +17,7 @@ module Domain.Action.Beckn.Update where
 import qualified API.Types.UI.EditBooking as EditBooking
 import qualified Beckn.Types.Core.Taxi.Common.Location as Common
 import qualified BecknV2.OnDemand.Enums as Enums
+import qualified BecknV2.OnDemand.FareBreakup.Core as FB
 import Data.List (last)
 import Data.List.Split (chunksOf)
 import Data.Maybe
@@ -65,6 +66,7 @@ import qualified SharedLogic.LocationMapping as SLM
 import qualified SharedLogic.MerchantPaymentMethod as DMPM
 import qualified SharedLogic.ParkingFeeExemption as SPFE
 import SharedLogic.Ride
+import qualified SharedLogic.RideTax as RideTax
 import qualified SharedLogic.Type as SLT
 import Storage.Beam.Toll ()
 import qualified Storage.CachedQueries.DomainDiscountConfig as CQDDC
@@ -251,6 +253,8 @@ handler (UAddBaggageReq AddBaggageReq {..}) = do
             computationPhase = FCEstimate,
             mbCapConfig = Nothing,
             mbEstimateFareParams = Nothing,
+            paymentChargeDetails = booking.paymentChargeDetails,
+            buyerOfferDiscount = booking.discountAmount,
             actualDistance = booking.estimatedDistance,
             rideTime = booking.startTime,
             returnTime = booking.returnTime,
@@ -267,6 +271,9 @@ handler (UAddBaggageReq AddBaggageReq {..}) = do
             negotiatedFareDelta = origFareParams.negotiatedFareDelta,
             nightShiftCharge = origFareParams.nightShiftCharge,
             customerCancellationDues = origFareParams.customerCancellationDues,
+            customerCancellationDuesTaxBreakup = (RideTax.resolveTaxBreakups origFareParams.currency Nothing (Just origFareParams) RideTax.noTaxableAmounts).riderPayable.cancellationFee,
+            customerCancellationDuesCommission = origFareParams.customerCancellationDuesCommission,
+            customerCancellationDuesCommissionTaxBreakup = (RideTax.resolveTaxBreakups origFareParams.currency Nothing (Just origFareParams) RideTax.noTaxableAmounts).driverDeductible.cancellationCommission,
             estimatedCongestionCharge = booking.estimatedCongestionCharge,
             isScheduled = booking.isScheduled,
             nightShiftOverlapChecking = nightShiftOverlapChecking,
@@ -283,7 +290,6 @@ handler (UAddBaggageReq AddBaggageReq {..}) = do
             merchantOperatingCityId = Just booking.merchantOperatingCityId,
             mbAdditonalChargeCategories = if null origAdditionalCategories then Nothing else Just origAdditionalCategories,
             numberOfLuggages = Just numberOfLuggages,
-            govtChargesRate = Just transporterCfg.taxConfig.rideGst,
             pickupGateId = booking.pickupGateId,
             fareSettlementType = booking.fareSettlementType,
             isParkingFeeExempt = False
@@ -466,6 +472,8 @@ handler (UEditLocationReq EditLocationReq {..}) = do
                     computationPhase = FCEstimate,
                     mbCapConfig = Nothing,
                     mbEstimateFareParams = Nothing,
+                    paymentChargeDetails = booking.paymentChargeDetails,
+                    buyerOfferDiscount = booking.discountAmount,
                     actualDistance = Just estimatedDistance,
                     rideTime = booking.startTime,
                     returnTime = booking.returnTime,
@@ -483,6 +491,9 @@ handler (UEditLocationReq EditLocationReq {..}) = do
                     negativeFareAdjustment = booking.fareParams.negativeFareAdjustment,
                     nightShiftCharge = booking.fareParams.nightShiftCharge,
                     customerCancellationDues = booking.fareParams.customerCancellationDues,
+                    customerCancellationDuesTaxBreakup = (RideTax.resolveTaxBreakups booking.fareParams.currency Nothing (Just booking.fareParams) RideTax.noTaxableAmounts).riderPayable.cancellationFee,
+                    customerCancellationDuesCommission = booking.fareParams.customerCancellationDuesCommission,
+                    customerCancellationDuesCommissionTaxBreakup = (RideTax.resolveTaxBreakups booking.fareParams.currency Nothing (Just booking.fareParams) RideTax.noTaxableAmounts).driverDeductible.cancellationCommission,
                     nightShiftOverlapChecking = False,
                     estimatedDistance = Just estimatedDistance,
                     estimatedRideDuration = Just duration,
@@ -498,7 +509,6 @@ handler (UEditLocationReq EditLocationReq {..}) = do
                     merchantOperatingCityId = Just booking.merchantOperatingCityId,
                     mbAdditonalChargeCategories = Just $ map (.chargeCategory) booking.fareParams.conditionalCharges,
                     numberOfLuggages = booking.numberOfLuggages,
-                    govtChargesRate = Just transporterConfig.taxConfig.rideGst,
                     pickupGateId = booking.pickupGateId,
                     fareSettlementType = booking.fareSettlementType,
                     isParkingFeeExempt = rcParkingFeeExempt
@@ -514,7 +524,7 @@ handler (UEditLocationReq EditLocationReq {..}) = do
                   let reqBody =
                         CallBAPInternal.OfferDiscountReq
                           { fareAmount = Just newEstimatedFare,
-                            projectFareParamsBreakup = FC.projectFareParamsBreakup fareParameters
+                            fareBreakups = Just (FC.mkFareParamsBreakups True (\amount -> amount) FB.BreakupLine fareParameters)
                           }
                   result <-
                     withTryCatch "getOfferDiscount:softUpdateEditDestination" $

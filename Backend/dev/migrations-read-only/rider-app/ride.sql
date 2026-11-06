@@ -481,3 +481,13 @@ ALTER TABLE atlas_app.ride ADD COLUMN cancellation_fee_immediate_capture boolean
 
 ALTER TABLE atlas_app.ride ADD COLUMN return_started_at timestamp with time zone ;
 ALTER TABLE atlas_app.ride ADD COLUMN return_otp text ;
+
+
+------- SQL updates -------
+
+ALTER TABLE atlas_app.ride ADD COLUMN payment_charge_tax_breakup json ;
+ALTER TABLE atlas_app.ride ADD COLUMN commission_tax_breakup json ;
+
+
+------- SQL updates -------
+

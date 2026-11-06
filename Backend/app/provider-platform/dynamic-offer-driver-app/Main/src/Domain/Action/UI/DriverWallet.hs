@@ -28,6 +28,7 @@ module Domain.Action.UI.DriverWallet
 where
 
 import qualified API.Types.UI.DriverWallet as DriverWallet
+import qualified BecknV2.OnDemand.FareBreakup.Tax as Tax
 import Data.List (partition, span)
 import qualified Data.Map.Strict as Map
 import qualified Data.Text as T
@@ -79,6 +80,7 @@ import SharedLogic.Finance.Prepaid (counterpartyFleetOwner)
 import SharedLogic.Finance.Wallet
 import SharedLogic.Finance.WalletPayout (WalletPayoutParams (..), computePayoutFee, ensurePayoutsEnabled, loadPayoutContext, runWalletPayout)
 import qualified SharedLogic.Payment as SPayment
+import qualified SharedLogic.RideTax as RideTax
 import qualified Storage.CachedQueries.Merchant as CQM
 import qualified Storage.CachedQueries.Merchant.MerchantOperatingCity as CQMOC
 import qualified Storage.Clickhouse.LedgerEntry as CHLE
@@ -402,6 +404,7 @@ referenceTypeToItemName isVat ref
   | ref == walletReferenceBaseRide = "Ride Earnings"
   | ref == walletReferenceTollCharges = "Toll Charges"
   | ref == walletReferenceParkingCharges = "Parking Charges"
+  | ref == walletReferenceAirportEntryFeeCharges = "Airport Entry Fee"
   | ref == walletReferenceTopup = "Wallet Top-up"
   | ref == walletReferenceGSTOnline = "GST (Online)"
   | ref == walletReferenceGSTCash = "GST (Cash)"
@@ -417,18 +420,19 @@ referenceTypeToItemName isVat ref
   | ref == walletReferenceDiscountsOnline = "Discounts Incl. " <> taxLabel <> " (Online)"
   | ref == walletReferenceDiscountsCash = "Discounts Incl. " <> taxLabel <> " (Cash)"
   | ref == walletReferenceCustomerCancellationCharges = "Cancellation Fee"
-  | ref == walletReferenceCustomerCancellationGST = "Cancellation Fee " <> taxLabel
+  | ref `elem` [walletReferenceCustomerCancellationGST, walletReferenceCustomerCancellationVAT] = "Cancellation Fee " <> taxLabel
   | ref == walletReferenceCommissionOnline = "Commission (Online)"
   | ref == walletReferenceCommissionCash = "Commission (Cash)"
-  | ref == walletReferenceCommissionVATOnline = "Commission " <> taxLabel <> " (Online)"
-  | ref == walletReferenceCommissionVATCash = "Commission " <> taxLabel <> " (Cash)"
+  | ref `elem` [walletReferenceCommissionVATOnline, walletReferenceCommissionGSTOnline] = "Commission " <> taxLabel <> " (Online)"
+  | ref `elem` [walletReferenceCommissionVATCash, walletReferenceCommissionGSTCash] = "Commission " <> taxLabel <> " (Cash)"
   | ref == walletReferenceCancellationCommission = "Cancellation Commission"
-  | ref == walletReferenceCancellationCommissionVAT = "Cancellation Commission " <> taxLabel
+  | ref `elem` [walletReferenceCancellationCommissionVAT, walletReferenceCancellationCommissionGST] = "Cancellation Commission " <> taxLabel
   | ref == walletReferenceDeductedAtPaymentByPlatform = "Commission Deducted at Payment"
+  | ref == walletReferencePaymentChargeDeductedAtPaymentByPlatform = "Payment Charge Deducted at Payment"
   | ref == walletReferencePaymentChargePaidByCustomer = "Payment Charge Paid by Customer"
-  | ref == walletReferencePaymentChargeVatPaidByCustomer = "Payment Charge VAT Paid by Customer"
+  | ref `elem` [walletReferencePaymentChargeVatPaidByCustomer, walletReferencePaymentChargeGstPaidByCustomer] = "Payment Charge " <> taxLabel <> " Paid by Customer"
   | ref == walletReferencePGPaymentCharges = "Payment Charge"
-  | ref == walletReferencePGPaymentChargesVAT = "Payment Charge VAT"
+  | ref `elem` [walletReferencePGPaymentChargesVAT, walletReferencePGPaymentChargesGST] = "Payment Charge " <> taxLabel
   | ref == walletReferencePGPayoutCharges = "Payout Charge"
   | ref == walletReferenceConnectAccountCharges = "Connect Account Charge"
   | otherwise = ref
@@ -436,7 +440,7 @@ referenceTypeToItemName isVat ref
     taxLabel = if isVat then "VAT" else "GST"
 
 isVatMerchant :: DTConf.TransporterConfig -> Bool
-isVatMerchant transporterConfig = isJust transporterConfig.taxConfig.serviceVatPercentage
+isVatMerchant transporterConfig = (RideTax.cityRideTax transporterConfig).regime == Tax.VAT
 
 -- | Per-row item name. A gate DriverFeeItem is booked under one shared reference
 --   type but is configured per gate, so its own name is carried on the ledger entry

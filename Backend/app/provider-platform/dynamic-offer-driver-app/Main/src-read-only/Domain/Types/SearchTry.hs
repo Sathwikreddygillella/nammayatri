@@ -3,6 +3,7 @@
 
 module Domain.Types.SearchTry where
 
+import qualified BecknV2.OnDemand.PaymentCharge
 import Data.Aeson
 import qualified Domain.Types.AddOnConfig
 import qualified Domain.Types.Common
@@ -29,6 +30,7 @@ data SearchTry = SearchTry
     createdAt :: Kernel.Prelude.UTCTime,
     currency :: Kernel.Types.Common.Currency,
     customerExtraFee :: Kernel.Prelude.Maybe Kernel.Types.Common.HighPrecMoney,
+    discountAmount :: Kernel.Prelude.Maybe Kernel.Types.Common.HighPrecMoney,
     driverPreference :: Kernel.Prelude.Maybe [Kernel.Prelude.Text],
     emailDomain :: Kernel.Prelude.Maybe Kernel.Prelude.Text,
     estimateId :: Kernel.Prelude.Text,
@@ -40,6 +42,7 @@ data SearchTry = SearchTry
     merchantOperatingCityId :: Kernel.Types.Id.Id Domain.Types.MerchantOperatingCity.MerchantOperatingCity,
     messageId :: Kernel.Prelude.Text,
     negativeFareAdjustment :: Kernel.Prelude.Maybe Kernel.Types.Common.HighPrecMoney,
+    paymentChargeDetails :: Kernel.Prelude.Maybe BecknV2.OnDemand.PaymentCharge.PaymentChargeDetails,
     paymentInstrument :: Kernel.Prelude.Maybe Domain.Types.Extra.MerchantPaymentMethod.PaymentInstrument,
     petCharges :: Kernel.Prelude.Maybe Kernel.Types.Common.HighPrecMoney,
     preferSafetyPlus :: Kernel.Prelude.Bool,

@@ -89,3 +89,10 @@ ALTER TABLE atlas_driver_offer_bpp.search_try ADD COLUMN add_on_data json ;
 
 ALTER TABLE atlas_driver_offer_bpp.search_try ADD COLUMN negative_fare_adjustment_amount double precision ;
 ALTER TABLE atlas_driver_offer_bpp.search_try ADD COLUMN negative_fare_adjustment integer ;
+
+
+
+------- SQL updates -------
+
+ALTER TABLE atlas_driver_offer_bpp.search_try ADD COLUMN payment_charge_details json ;
+ALTER TABLE atlas_driver_offer_bpp.search_try ADD COLUMN discount_amount double precision ;

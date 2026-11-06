@@ -348,3 +348,18 @@ ALTER TABLE atlas_driver_offer_bpp.ride ADD COLUMN recompute_reason text ;
 ALTER TABLE atlas_driver_offer_bpp.ride ADD COLUMN cancelled_by text ;
 ALTER TABLE atlas_driver_offer_bpp.ride ADD COLUMN cancellation_reason_code text ;
 ALTER TABLE atlas_driver_offer_bpp.ride ADD COLUMN cancellation_additional_info text ;
+
+
+------- SQL updates -------
+
+ALTER TABLE atlas_driver_offer_bpp.ride ADD COLUMN payment_charge_tax_breakup json ;
+ALTER TABLE atlas_driver_offer_bpp.ride ADD COLUMN commission_tax_breakup json ;
+ALTER TABLE atlas_driver_offer_bpp.ride ADD COLUMN cancellation_fee_tax_breakup_if_cancelled json ;
+ALTER TABLE atlas_driver_offer_bpp.ride ADD COLUMN cancellation_commission_tax_breakup_if_cancelled json ;
+ALTER TABLE atlas_driver_offer_bpp.ride ADD COLUMN cancellation_commission_tax_breakup json ;
+ALTER TABLE atlas_driver_offer_bpp.ride ADD COLUMN cancellation_commission_if_cancelled double precision ;
+ALTER TABLE atlas_driver_offer_bpp.ride ADD COLUMN cancellation_charges_on_cancel_tax double precision ;
+
+
+------- SQL updates -------
+

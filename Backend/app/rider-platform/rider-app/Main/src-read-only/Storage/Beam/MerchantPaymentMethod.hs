@@ -3,24 +3,31 @@
 
 module Storage.Beam.MerchantPaymentMethod where
 
+import qualified Data.Aeson
 import qualified Database.Beam as B
 import Domain.Types.Common ()
 import qualified Domain.Types.Extra.MerchantPaymentMethod
+import qualified Domain.Types.PaymentChargeBearer
 import Kernel.External.Encryption
 import Kernel.Prelude
 import qualified Kernel.Prelude
+import qualified Kernel.Types.Common
 import Tools.Beam.UtilsTH
 
 data MerchantPaymentMethodT f = MerchantPaymentMethodT
-  { collectedBy :: (B.C f Domain.Types.Extra.MerchantPaymentMethod.PaymentCollector),
-    createdAt :: (B.C f Kernel.Prelude.UTCTime),
-    id :: (B.C f Kernel.Prelude.Text),
-    merchantId :: (B.C f Kernel.Prelude.Text),
-    merchantOperatingCityId :: (B.C f Kernel.Prelude.Text),
-    paymentInstrument :: (B.C f Domain.Types.Extra.MerchantPaymentMethod.PaymentInstrument),
-    paymentType :: (B.C f Domain.Types.Extra.MerchantPaymentMethod.PaymentType),
-    priority :: (B.C f Kernel.Prelude.Int),
-    updatedAt :: (B.C f Kernel.Prelude.UTCTime)
+  { collectedBy :: B.C f Domain.Types.Extra.MerchantPaymentMethod.PaymentCollector,
+    createdAt :: B.C f Kernel.Prelude.UTCTime,
+    id :: B.C f Kernel.Prelude.Text,
+    merchantId :: B.C f Kernel.Prelude.Text,
+    merchantOperatingCityId :: B.C f Kernel.Prelude.Text,
+    paymentCharge :: B.C f (Kernel.Prelude.Maybe Kernel.Types.Common.HighPrecMoney),
+    paymentChargeBearer :: B.C f (Kernel.Prelude.Maybe Domain.Types.PaymentChargeBearer.PaymentChargeBearer),
+    paymentChargeTax :: B.C f (Kernel.Prelude.Maybe Data.Aeson.Value),
+    paymentChargeType :: B.C f (Kernel.Prelude.Maybe Domain.Types.PaymentChargeBearer.PaymentChargeType),
+    paymentInstrument :: B.C f Domain.Types.Extra.MerchantPaymentMethod.PaymentInstrument,
+    paymentType :: B.C f Domain.Types.Extra.MerchantPaymentMethod.PaymentType,
+    priority :: B.C f Kernel.Prelude.Int,
+    updatedAt :: B.C f Kernel.Prelude.UTCTime
   }
   deriving (Generic, B.Beamable)
 
@@ -30,6 +37,6 @@ instance B.Table MerchantPaymentMethodT where
 
 type MerchantPaymentMethod = MerchantPaymentMethodT Identity
 
-$(enableKVPG (''MerchantPaymentMethodT) [('id)] [])
+$(enableKVPG ''MerchantPaymentMethodT ['id] [])
 
-$(mkTableInstances (''MerchantPaymentMethodT) "merchant_payment_method")
+$(mkTableInstances ''MerchantPaymentMethodT "merchant_payment_method")

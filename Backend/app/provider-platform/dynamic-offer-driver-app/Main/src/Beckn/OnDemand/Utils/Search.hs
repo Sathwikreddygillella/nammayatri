@@ -226,12 +226,6 @@ getIsReallocationEnabled req = do
       tagValue = Utils.getTag Tag.IS_REALLOCATION_ENABLED tagGroups
   readMaybe . T.unpack =<< tagValue
 
-fareParametersInRateCard :: Spec.SearchReqMessage -> Maybe Bool
-fareParametersInRateCard req = do
-  let tagGroups = req.searchReqMessageIntent >>= (.intentFulfillment) >>= (.fulfillmentTags)
-      tagValue = Utils.getTag Tag.FARE_PARAMETERS_IN_RATECARD tagGroups
-  readMaybe . T.unpack =<< tagValue
-
 buildRoutePoints :: Spec.SearchReqMessage -> Maybe [Maps.LatLong]
 buildRoutePoints req = do
   let tagGroups = req.searchReqMessageIntent >>= (.intentFulfillment) >>= (.fulfillmentTags)

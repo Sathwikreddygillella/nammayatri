@@ -584,7 +584,6 @@ types:
     - parkingChargeWithCurrency: Maybe PriceAPIEntity
     - tollFareTaxWithCurrency: Maybe PriceAPIEntity
     - discountWithCurrency: Maybe PriceAPIEntity
-    - discountTaxWithCurrency: Maybe PriceAPIEntity
     - updatedAt: UTCTime
   FareParametersDetails:
     - enum: "ProgressiveDetails FParamsProgressiveDetails, SlabDetails FParamsSlabDetails, RentalDetails FParamsRentalDetails, InterCityDetails FParamsInterCityDetails, AmbulanceDetails FParamsAmbulanceDetails"

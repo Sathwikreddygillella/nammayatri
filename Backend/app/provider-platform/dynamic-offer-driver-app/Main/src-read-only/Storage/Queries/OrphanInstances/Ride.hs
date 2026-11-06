@@ -14,6 +14,7 @@ import qualified Kernel.Types.Common
 import Kernel.Types.Error
 import qualified Kernel.Types.Id
 import Kernel.Utils.Common (CacheFlow, EsqDBFlow, MonadFlow, fromMaybeM, getCurrentTime)
+import qualified Kernel.Utils.JSON
 import qualified Kernel.Utils.Version
 import qualified Lib.Yudhishthira.Tools.Utils
 import qualified SharedLogic.Type
@@ -42,11 +43,16 @@ instance FromTType' Beam.Ride Domain.Types.Ride.Ride where
             bookingId = Kernel.Types.Id.Id bookingId,
             cancellationAdditionalInfo = cancellationAdditionalInfo,
             cancellationChargesOnCancel = cancellationChargesOnCancel,
+            cancellationChargesOnCancelTax = cancellationChargesOnCancelTax,
             cancellationCommission = cancellationCommission,
+            cancellationCommissionIfCancelled = cancellationCommissionIfCancelled,
+            cancellationCommissionTaxBreakup = Kernel.Utils.JSON.valueToMaybe =<< cancellationCommissionTaxBreakup,
+            cancellationCommissionTaxBreakupIfCancelled = Kernel.Utils.JSON.valueToMaybe =<< cancellationCommissionTaxBreakupIfCancelled,
             cancellationConsequenceRowIdIfCancelled = cancellationConsequenceRowIdIfCancelled,
             cancellationFaultRule = cancellationFaultRule,
             cancellationFaultVerdict = cancellationFaultVerdict,
             cancellationFeeIfCancelled = cancellationFeeIfCancelled,
+            cancellationFeeTaxBreakupIfCancelled = Kernel.Utils.JSON.valueToMaybe =<< cancellationFeeTaxBreakupIfCancelled,
             cancellationFeeTaxIfCancelled = cancellationFeeTaxIfCancelled,
             cancellationReasonCode = Domain.Types.CancellationReason.CancellationReasonCode <$> cancellationReasonCode,
             cancelledBy = cancelledBy,
@@ -58,6 +64,7 @@ instance FromTType' Beam.Ride Domain.Types.Ride.Ride where
             clientSdkVersion = clientSdkVersion',
             cloudType = cloudType,
             commission = commission,
+            commissionTaxBreakup = Kernel.Utils.JSON.valueToMaybe =<< commissionTaxBreakup,
             createdAt = createdAt,
             currency = Kernel.Prelude.fromMaybe Kernel.Types.Common.INR currency,
             deliveryFileIds = (Kernel.Types.Id.Id <$>) <$> deliveryFileIds,
@@ -109,6 +116,7 @@ instance FromTType' Beam.Ride Domain.Types.Ride.Ride where
             passedThroughDestination = passedThroughDestination,
             paymentCharge = paymentCharge,
             paymentChargeBearer = paymentChargeBearer,
+            paymentChargeTaxBreakup = Kernel.Utils.JSON.valueToMaybe =<< paymentChargeTaxBreakup,
             pickupBehaviour = pickupBehaviour,
             pickupDarkSeconds = pickupDarkSeconds,
             pickupDistanceCalculationFailed = pickupDistanceCalculationFailed,
@@ -162,11 +170,16 @@ instance ToTType' Beam.Ride Domain.Types.Ride.Ride where
         Beam.bookingId = Kernel.Types.Id.getId bookingId,
         Beam.cancellationAdditionalInfo = cancellationAdditionalInfo,
         Beam.cancellationChargesOnCancel = cancellationChargesOnCancel,
+        Beam.cancellationChargesOnCancelTax = cancellationChargesOnCancelTax,
         Beam.cancellationCommission = cancellationCommission,
+        Beam.cancellationCommissionIfCancelled = cancellationCommissionIfCancelled,
+        Beam.cancellationCommissionTaxBreakup = toJSON <$> cancellationCommissionTaxBreakup,
+        Beam.cancellationCommissionTaxBreakupIfCancelled = toJSON <$> cancellationCommissionTaxBreakupIfCancelled,
         Beam.cancellationConsequenceRowIdIfCancelled = cancellationConsequenceRowIdIfCancelled,
         Beam.cancellationFaultRule = cancellationFaultRule,
         Beam.cancellationFaultVerdict = cancellationFaultVerdict,
         Beam.cancellationFeeIfCancelled = cancellationFeeIfCancelled,
+        Beam.cancellationFeeTaxBreakupIfCancelled = toJSON <$> cancellationFeeTaxBreakupIfCancelled,
         Beam.cancellationFeeTaxIfCancelled = cancellationFeeTaxIfCancelled,
         Beam.cancellationReasonCode = (\(Domain.Types.CancellationReason.CancellationReasonCode x) -> x) <$> cancellationReasonCode,
         Beam.cancelledBy = cancelledBy,
@@ -181,6 +194,7 @@ instance ToTType' Beam.Ride Domain.Types.Ride.Ride where
         Beam.clientSdkVersion = fmap Kernel.Utils.Version.versionToText clientSdkVersion,
         Beam.cloudType = cloudType,
         Beam.commission = commission,
+        Beam.commissionTaxBreakup = toJSON <$> commissionTaxBreakup,
         Beam.createdAt = createdAt,
         Beam.currency = Kernel.Prelude.Just currency,
         Beam.deliveryFileIds = (Kernel.Types.Id.getId <$>) <$> deliveryFileIds,
@@ -234,6 +248,7 @@ instance ToTType' Beam.Ride Domain.Types.Ride.Ride where
         Beam.passedThroughDestination = passedThroughDestination,
         Beam.paymentCharge = paymentCharge,
         Beam.paymentChargeBearer = paymentChargeBearer,
+        Beam.paymentChargeTaxBreakup = toJSON <$> paymentChargeTaxBreakup,
         Beam.pickupBehaviour = pickupBehaviour,
         Beam.pickupDarkSeconds = pickupDarkSeconds,
         Beam.pickupDistanceCalculationFailed = pickupDistanceCalculationFailed,

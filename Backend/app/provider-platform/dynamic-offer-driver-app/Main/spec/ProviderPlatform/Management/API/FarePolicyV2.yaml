@@ -10,6 +10,7 @@ imports:
   DistanceUnit: Kernel.Types.Common
   Months: Kernel.Types.Time
   TimeBound: Kernel.Types.TimeBound
+  TaxConfig: BecknV2.OnDemand.FareBreakup.Tax
   Area: Lib.Types.SpecialLocation
   TripCategory: Dashboard.Common
   ServiceTierType: Dashboard.Common
@@ -193,7 +194,7 @@ types:
     - perDistanceUnitMultiplier: Maybe Double
     - fixed: Maybe HighPrecMoney
   FPV2FareChargeComponent:
-    - enum: "RideFare, WaitingCharge, ServiceChargeComponent, TollChargesComponent, CongestionChargeComponent, ParkingChargeComponent, PetChargeComponent, PriorityChargeComponent, NightShiftChargeComponent, InsuranceChargeComponent, StopChargeComponent, LuggageChargeComponent, PlatformFeeComponent, CustomerCancellationChargeComponent, CustomerExtraFeeComponent, AddOnChargeComponent, DeadKmFareComponent, ExtraKmFareComponent, RideDurationFareComponent, TimeBasedFareComponent, DistBasedFareComponent, TimeFareComponent, DistanceFareComponent, PickupChargeComponent, ExtraDistanceFareComponent, ExtraTimeFareComponent, StateEntryPermitChargesComponent, AmbulanceDistBasedFareComponent, RideVatComponent, TollVatComponent, DriverAllowanceComponent, AirportConvenienceFeeComponent, ReturnFeeChargeComponent, BoothChargeComponent, RideExtraTimeFareComponent"
+    - enum: "RideFare, WaitingCharge, ServiceChargeComponent, TollChargesComponent, CongestionChargeComponent, ParkingChargeComponent, PetChargeComponent, PriorityChargeComponent, NightShiftChargeComponent, InsuranceChargeComponent, StopChargeComponent, LuggageChargeComponent, PlatformFeeComponent, CustomerCancellationChargeComponent, CustomerExtraFeeComponent, AddOnChargeComponent, DeadKmFareComponent, ExtraKmFareComponent, RideDurationFareComponent, TimeBasedFareComponent, DistBasedFareComponent, TimeFareComponent, DistanceFareComponent, PickupChargeComponent, ExtraDistanceFareComponent, ExtraTimeFareComponent, StateEntryPermitChargesComponent, AmbulanceDistBasedFareComponent, RideVatComponent, TollVatComponent, DriverAllowanceComponent, AirportConvenienceFeeComponent, ReturnFeeChargeComponent, BoothChargeComponent, RideExtraTimeFareComponent, DriverSelectedFareComponent"
   FPV2FareChargeConfig:
     - value: Text
     - appliesOn: "[FPV2FareChargeComponent]"
@@ -216,6 +217,7 @@ types:
     - platformFeeCharge: FPV2PlatformFeeCharge
     - cgst: Double
     - sgst: Double
+    - vat: Maybe Double
   FPV2CancellationFarePolicy:
     - description: Text
     - freeCancellationTimeSeconds: Seconds
@@ -339,10 +341,12 @@ types:
     - congestionChargeMultiplier: Maybe FPV2CongestionChargeMultiplier
     - perDistanceUnitInsuranceCharge: Maybe HighPrecMoney
     - cardCharge: Maybe FPV2CardCharge
-    - vatChargeConfig: Maybe FPV2FareChargeConfig
     - commissionChargeConfig: Maybe FPV2FareChargeConfig
     - cancellationCommissionChargeConfig: Maybe FPV2FareChargeConfig
-    - tollTaxChargeConfig: Maybe FPV2FareChargeConfig
+    - rideTaxConfig: Maybe TaxConfig
+    - tollTaxConfig: Maybe TaxConfig
+    - parkingTaxConfig: Maybe TaxConfig
+    - commissionTaxConfig: Maybe TaxConfig
     - platformFee: Maybe HighPrecMoney
     - platformFeeCgst: Maybe HighPrecMoney
     - platformFeeSgst: Maybe HighPrecMoney

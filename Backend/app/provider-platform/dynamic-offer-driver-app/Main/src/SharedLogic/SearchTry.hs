@@ -14,6 +14,7 @@
 
 module SharedLogic.SearchTry where
 
+import BecknV2.OnDemand.PaymentCharge (PaymentChargeDetails)
 import Control.Applicative ((<|>))
 import qualified Data.HashMap.Strict as HM
 import qualified Data.HashMap.Strict as HMS
@@ -25,6 +26,7 @@ import qualified Domain.Types.AddOnConfig as DAddOnConfig
 import Domain.Types.ConditionalCharges as DAC
 import Domain.Types.DriverPoolConfig
 import qualified Domain.Types.Extra.MerchantPaymentMethod as DMPM
+import qualified Domain.Types.FareParameters as DFParams
 import qualified Domain.Types.FarePolicy as DFP
 import qualified Domain.Types.Merchant as DM
 import qualified Domain.Types.SearchRequest as DSR
@@ -55,6 +57,7 @@ import SharedLogic.FarePolicy
 import SharedLogic.GoogleTranslate (TranslateFlow)
 import qualified SharedLogic.MetricsLabels as SML
 import SharedLogic.Pricing
+import qualified SharedLogic.RideTax as RideTax
 import qualified SharedLogic.Type as SLT
 import Storage.Cac.DriverPoolConfig (getDriverPoolConfig)
 import qualified Storage.CachedQueries.VehicleServiceTier as CQDVST
@@ -245,7 +248,7 @@ initiateDriverSearchBatch searchBatchInput@DriverSearchBatchInput {..} = do
           searchTry <- case mbLastSearchTry of
             Nothing -> do
               mbBatchingMode <- resolveBatchingMode serviceTier tripCategory DST.INITIAL 0
-              searchTry <- buildSearchTry merchant.id searchReq estimateOrQuoteIds estOrQuoteId estimatedFare 0 DST.INITIAL tripCategory billingCategory customerExtraFee negativeFareAdjustment firstQuoteDetail.petCharges messageId estimateOrQuoteServiceTierNames serviceTier emailDomain searchBatchInput.businessEmailDomain driverPreference ((.paymentInstrument) <$> paymentMethodInfo) transporterConfig mbBatchingMode searchBatchInput.addOnData
+              searchTry <- buildSearchTry merchant.id searchReq estimateOrQuoteIds estOrQuoteId estimatedFare 0 DST.INITIAL tripCategory billingCategory customerExtraFee negativeFareAdjustment firstQuoteDetail.petCharges messageId estimateOrQuoteServiceTierNames serviceTier emailDomain searchBatchInput.businessEmailDomain driverPreference ((.paymentInstrument) <$> paymentMethodInfo) transporterConfig mbBatchingMode searchBatchInput.addOnData searchBatchInput.paymentChargeDetails searchBatchInput.buyerOfferDiscount
               _ <- QST.create searchTry
               return searchTry
             Just oldSearchTry -> do
@@ -257,7 +260,7 @@ initiateDriverSearchBatch searchBatchInput@DriverSearchBatchInput {..} = do
               -- unless (pureEstimatedFare == oldSearchTry.baseFare - fromMaybe 0 oldSearchTry.customerExtraFee) $
               --   throwError SearchTryEstimatedFareChanged
               mbBatchingMode <- resolveBatchingMode serviceTier tripCategory searchRepeatType (oldSearchTry.searchRepeatCounter + 1)
-              searchTry <- buildSearchTry merchant.id searchReq estimateOrQuoteIds estOrQuoteId estimatedFare (oldSearchTry.searchRepeatCounter + 1) searchRepeatType tripCategory billingCategory customerExtraFee negativeFareAdjustment firstQuoteDetail.petCharges messageId estimateOrQuoteServiceTierNames serviceTier emailDomain searchBatchInput.businessEmailDomain driverPreference ((.paymentInstrument) <$> paymentMethodInfo) transporterConfig mbBatchingMode searchBatchInput.addOnData
+              searchTry <- buildSearchTry merchant.id searchReq estimateOrQuoteIds estOrQuoteId estimatedFare (oldSearchTry.searchRepeatCounter + 1) searchRepeatType tripCategory billingCategory customerExtraFee negativeFareAdjustment firstQuoteDetail.petCharges messageId estimateOrQuoteServiceTierNames serviceTier emailDomain searchBatchInput.businessEmailDomain driverPreference ((.paymentInstrument) <$> paymentMethodInfo) transporterConfig mbBatchingMode searchBatchInput.addOnData searchBatchInput.paymentChargeDetails searchBatchInput.buyerOfferDiscount
               when (oldSearchTry.status == DST.ACTIVE) $ do
                 QST.updateStatus DST.CANCELLED oldSearchTry.id
                 void $ QDQ.setInactiveBySTId oldSearchTry.id
@@ -303,8 +306,10 @@ buildSearchTry ::
   DTTC.TransporterConfig ->
   Maybe BatchingMode ->
   [DAddOnConfig.AddOnData] ->
+  Maybe PaymentChargeDetails ->
+  Maybe HighPrecMoney ->
   m DST.SearchTry
-buildSearchTry merchantId searchReq estimateOrQuoteIds estOrQuoteId baseFare searchRepeatCounter searchRepeatType tripCategory billingCategory customerExtraFee negativeFareAdjustment petCharges messageId estimateOrQuoteServTierNames serviceTier emailDomain businessEmailDomain driverPreference mbPaymentInstrument transporterConfig mbBatchingMode addOnData = do
+buildSearchTry merchantId searchReq estimateOrQuoteIds estOrQuoteId baseFare searchRepeatCounter searchRepeatType tripCategory billingCategory customerExtraFee negativeFareAdjustment petCharges messageId estimateOrQuoteServTierNames serviceTier emailDomain businessEmailDomain driverPreference mbPaymentInstrument transporterConfig mbBatchingMode addOnData mbPaymentChargeDetails mbBuyerOfferDiscount = do
   now <- getCurrentTime
   id_ <- Id <$> generateGUID
   vehicleServiceTierItem <- CQVST.findByServiceTierTypeAndCityIdInRideFlow serviceTier searchReq.merchantOperatingCityId (searchReq.area >>= SL.pickupSpecialZoneIdFromArea) >>= fromMaybeM (VehicleServiceTierNotFound (show serviceTier))
@@ -340,6 +345,8 @@ buildSearchTry merchantId searchReq estimateOrQuoteIds estOrQuoteId baseFare sea
         driverPreference = driverPreference,
         businessEmailDomain = businessEmailDomain,
         paymentInstrument = mbPaymentInstrument,
+        paymentChargeDetails = mbPaymentChargeDetails,
+        discountAmount = mbBuyerOfferDiscount,
         ..
       }
 
@@ -374,8 +381,10 @@ buildTripQuoteDetail ::
   Maybe HighPrecMoney ->
   Maybe Bool ->
   Maybe HighPrecMoney -> -- bufferedFare, from this estimate/quote's FareParameters
+  Maybe DFP.FarePolicy ->
+  Maybe DFParams.FareParameters ->
   m TripQuoteDetail
-buildTripQuoteDetail searchReq tripCategory vehicleServiceTier mbVehicleServiceTierName baseFare isDashboardRequest mbDriverMinFee mbDriverMaxFee mbStepFee mbDefaultStepFee mDriverPickUpCharge mbDriverParkingCharge estimateOrQuoteId conditionalCharges eligibleForUpgrade congestionCharges petCharges priorityCharges commissionCharges mbTollCharges govtCharges mbDriverCancellationNotAllowed bufferedFare = do
+buildTripQuoteDetail searchReq tripCategory vehicleServiceTier mbVehicleServiceTierName baseFare isDashboardRequest mbDriverMinFee mbDriverMaxFee mbStepFee mbDefaultStepFee mDriverPickUpCharge mbDriverParkingCharge estimateOrQuoteId conditionalCharges eligibleForUpgrade congestionCharges petCharges priorityCharges commissionCharges mbTollCharges govtCharges mbDriverCancellationNotAllowed bufferedFare farePolicy mbFareParams = do
   mbVehicleServiceTierItem <- CQDVST.findByServiceTierTypeAndCityIdInRideFlow vehicleServiceTier searchReq.merchantOperatingCityId (searchReq.area >>= SL.pickupSpecialZoneIdFromArea)
   let vehicleCategory = mbVehicleServiceTierItem >>= (.vehicleCategory)
   vehicleServiceTierName <-
@@ -384,25 +393,29 @@ buildTripQuoteDetail searchReq tripCategory vehicleServiceTier mbVehicleServiceT
       _ -> do
         item <- mbVehicleServiceTierItem & fromMaybeM (VehicleServiceTierNotFound $ show vehicleServiceTier)
         return item.name
-  (driverParkingCharge, tollCharges, driverPickUpCharge, driverMinFee, driverMaxFee, driverStepFee, driverDefaultStepFee, driverCancellationNotAllowed) <-
+  transporterConfig <- getOneConfig (TransporterConfigDimensions {merchantOperatingCityId = searchReq.merchantOperatingCityId.getId}) Nothing >>= fromMaybeM (TransporterConfigNotFound searchReq.merchantOperatingCityId.getId)
+  (driverParkingCharge, tollCharges, driverPickUpCharge, driverMinFee, driverMaxFee, driverStepFee, driverDefaultStepFee, driverCancellationNotAllowed, commissionChargeConfig, rideTax) <-
     case (mbDriverParkingCharge, mbTollCharges, mDriverPickUpCharge, mbDriverMinFee, mbDriverMaxFee, mbStepFee, mbDefaultStepFee) of
       (Just parkingCharge, Just tollCharges', Just charge, Just minFee, Just maxFee, Just stepFee, Just defaultStepFee) ->
-        return (Just parkingCharge, Just tollCharges', Just charge, Just minFee, Just maxFee, Just stepFee, Just defaultStepFee, mbDriverCancellationNotAllowed)
+        return (Just parkingCharge, Just tollCharges', Just charge, Just minFee, Just maxFee, Just stepFee, Just defaultStepFee, mbDriverCancellationNotAllowed, farePolicy >>= (.commissionChargeConfig), Just (RideTax.resolveTaxRates transporterConfig farePolicy Nothing))
       _ -> do
-        farePolicy <- getFarePolicyByEstOrQuoteId (Just $ getCoordinates searchReq.fromLocation) (Just . getCoordinates =<< searchReq.toLocation) searchReq.fromLocGeohash searchReq.toLocGeohash searchReq.estimatedDistance searchReq.estimatedDuration searchReq.merchantOperatingCityId tripCategory vehicleServiceTier searchReq.area estimateOrQuoteId Nothing isDashboardRequest searchReq.dynamicPricingLogicVersion (Just (TransactionId (Id searchReq.transactionId))) searchReq.configInExperimentVersions searchReq.specialLocationName
-        let mbDriverExtraFeeBounds = DFP.findDriverExtraFeeBoundsByDistance (fromMaybe 0 searchReq.estimatedDistance) <$> farePolicy.driverExtraFeeBounds
+        fallbackFarePolicy <- getFarePolicyByEstOrQuoteId (Just $ getCoordinates searchReq.fromLocation) (Just . getCoordinates =<< searchReq.toLocation) searchReq.fromLocGeohash searchReq.toLocGeohash searchReq.estimatedDistance searchReq.estimatedDuration searchReq.merchantOperatingCityId tripCategory vehicleServiceTier searchReq.area estimateOrQuoteId Nothing isDashboardRequest searchReq.dynamicPricingLogicVersion (Just (TransactionId (Id searchReq.transactionId))) searchReq.configInExperimentVersions searchReq.specialLocationName
+        let mbDriverExtraFeeBounds = DFP.findDriverExtraFeeBoundsByDistance (fromMaybe 0 searchReq.estimatedDistance) <$> fallbackFarePolicy.driverExtraFeeBounds
             -- Parking already EDC-collected at the booth for these settlement types isn't the
             -- driver's cash to hold - don't factor it into the driver's cash-wallet eligibility check.
-            edcCollectsParking = SL.edcCollectsParking farePolicy.fareSettlementType
-            driverFacingParkingCharge = if edcCollectsParking then Nothing else farePolicy.parkingCharge
+            edcCollectsParking = SL.edcCollectsParking fallbackFarePolicy.fareSettlementType
+            driverFacingParkingCharge = if edcCollectsParking then Nothing else fallbackFarePolicy.parkingCharge
         return $
           ( driverFacingParkingCharge,
-            farePolicy.tollCharges,
-            USRD.extractDriverPickupCharges farePolicy.farePolicyDetails,
+            fallbackFarePolicy.tollCharges,
+            USRD.extractDriverPickupCharges fallbackFarePolicy.farePolicyDetails,
             mbDriverExtraFeeBounds <&> (.minFee),
             mbDriverExtraFeeBounds <&> (.maxFee),
             mbDriverExtraFeeBounds <&> (.stepFee),
             mbDriverExtraFeeBounds <&> (.defaultStepFee),
-            mbDriverCancellationNotAllowed <|> farePolicy.driverCancellationNotAllowed
+            mbDriverCancellationNotAllowed <|> fallbackFarePolicy.driverCancellationNotAllowed,
+            (farePolicy >>= (.commissionChargeConfig)) <|> fallbackFarePolicy.commissionChargeConfig,
+            Just (maybe (RideTax.resolveTaxRates transporterConfig (Just fallbackFarePolicy) Nothing) (\fp -> RideTax.resolveTaxRates transporterConfig (Just fp) Nothing) farePolicy)
           )
+  let riderTaxes = RideTax.fareTaxTotal <$> mbFareParams
   return $ TripQuoteDetail {..}

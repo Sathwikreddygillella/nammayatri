@@ -397,6 +397,8 @@ postFarePolicyV2Preview merchantShortId opCity req = do
               computationPhase = SFC.FCEstimate,
               mbCapConfig = Nothing,
               mbEstimateFareParams = Nothing,
+              paymentChargeDetails = Nothing,
+              buyerOfferDiscount = Nothing,
               actualDistance = Just trip.distance,
               rideTime = fromMaybe now trip.rideTime,
               returnTime = Nothing,
@@ -410,6 +412,9 @@ postFarePolicyV2Preview merchantShortId opCity req = do
               negativeFareAdjustment = Nothing,
               nightShiftCharge = Nothing,
               customerCancellationDues = Nothing,
+              customerCancellationDuesTaxBreakup = Nothing,
+              customerCancellationDuesCommission = Nothing,
+              customerCancellationDuesCommissionTaxBreakup = Nothing,
               nightShiftOverlapChecking = isJust trip.rideTime,
               estimatedDistance = Just trip.distance,
               estimatedRideDuration = Just trip.duration,
@@ -429,7 +434,6 @@ postFarePolicyV2Preview merchantShortId opCity req = do
               merchantOperatingCityId = Just merchantOpCity.id,
               mbAdditonalChargeCategories = Nothing,
               numberOfLuggages = Nothing,
-              govtChargesRate = Just transporterConfig.taxConfig.rideGst,
               pickupGateId = Nothing,
               fareSettlementType = Nothing,
               isParkingFeeExempt = False
@@ -442,7 +446,7 @@ postFarePolicyV2Preview merchantShortId opCity req = do
         pickupSpread = case domainPolicy.farePolicyDetails of
           FarePolicyD.ProgressiveDetails d -> d.pickupCharges.pickupChargesMax - d.pickupCharges.pickupChargesMin
           _ -> 0
-        breakup = SFC.mkFareParamsDisplayBreakups True identity Common.FPV2FareBreakupItem fareParams
+        breakup = SFC.mkFareParamsBreakups True identity Common.FPV2FareBreakupItem fareParams
     pure
       Common.FPV2TripPreview
         { distance = trip.distance,
@@ -970,10 +974,12 @@ toApiPolicy policy mbCancellation =
       congestionChargeMultiplier = toApiCongestionMultiplier <$> policy.congestionChargeMultiplier,
       perDistanceUnitInsuranceCharge = policy.perDistanceUnitInsuranceCharge,
       cardCharge = (\c -> Common.FPV2CardCharge {perDistanceUnitMultiplier = c.perDistanceUnitMultiplier, fixed = c.fixed}) <$> policy.cardCharge,
-      vatChargeConfig = toApiChargeConfig <$> policy.vatChargeConfig,
       commissionChargeConfig = toApiChargeConfig <$> policy.commissionChargeConfig,
       cancellationCommissionChargeConfig = toApiChargeConfig <$> policy.cancellationCommissionChargeConfig,
-      tollTaxChargeConfig = toApiChargeConfig <$> policy.tollTaxChargeConfig,
+      rideTaxConfig = policy.rideTaxConfig,
+      tollTaxConfig = policy.tollTaxConfig,
+      parkingTaxConfig = policy.parkingTaxConfig,
+      commissionTaxConfig = policy.commissionTaxConfig,
       platformFee = policy.platformFee,
       platformFeeCgst = policy.cgst,
       platformFeeSgst = policy.sgst,
@@ -1142,10 +1148,12 @@ fromApiPolicy ctx mbCancellationId now p = do
         congestionChargeMultiplier = fromApiCongestionMultiplier <$> p.congestionChargeMultiplier,
         perDistanceUnitInsuranceCharge = p.perDistanceUnitInsuranceCharge,
         cardCharge = (\c -> FarePolicyD.CardCharge {perDistanceUnitMultiplier = c.perDistanceUnitMultiplier, fixed = c.fixed}) <$> p.cardCharge,
-        vatChargeConfig = fromApiChargeConfig <$> p.vatChargeConfig,
         commissionChargeConfig = fromApiChargeConfig <$> p.commissionChargeConfig,
         cancellationCommissionChargeConfig = fromApiChargeConfig <$> p.cancellationCommissionChargeConfig,
-        tollTaxChargeConfig = fromApiChargeConfig <$> p.tollTaxChargeConfig,
+        rideTaxConfig = p.rideTaxConfig,
+        tollTaxConfig = p.tollTaxConfig,
+        parkingTaxConfig = p.parkingTaxConfig,
+        commissionTaxConfig = p.commissionTaxConfig,
         farePolicyDetails = details,
         cancellationFarePolicyId = mbCancellationId,
         negotiationFareMinTolerancePct = p.negotiationFareMinTolerancePct,
@@ -1379,7 +1387,8 @@ toApiPlatformFeeInfo p =
         FarePolicyD.ProgressivePlatformFee m -> Common.ProgressivePlatformFee m
         FarePolicyD.ConstantPlatformFee m -> Common.ConstantPlatformFee m,
       cgst = p.cgst,
-      sgst = p.sgst
+      sgst = p.sgst,
+      vat = p.vat
     }
 
 fromApiPlatformFeeInfo :: Common.FPV2PlatformFeeInfo -> FarePolicyD.PlatformFeeInfo
@@ -1389,7 +1398,8 @@ fromApiPlatformFeeInfo p =
         Common.ProgressivePlatformFee m -> FarePolicyD.ProgressivePlatformFee m
         Common.ConstantPlatformFee m -> FarePolicyD.ConstantPlatformFee m,
       cgst = p.cgst,
-      sgst = p.sgst
+      sgst = p.sgst,
+      vat = p.vat
     }
 
 toApiDurationBasis :: DFPC.PerMinRateDurationBasis -> Common.FPV2PerMinRateDurationBasis
@@ -1473,6 +1483,7 @@ toApiChargeComponent = \case
   FarePolicyD.ReturnFeeChargeComponent -> Common.ReturnFeeChargeComponent
   FarePolicyD.BoothChargeComponent -> Common.BoothChargeComponent
   FarePolicyD.RideExtraTimeFareComponent -> Common.RideExtraTimeFareComponent
+  FarePolicyD.DriverSelectedFareComponent -> Common.DriverSelectedFareComponent
 
 fromApiChargeComponent :: Common.FPV2FareChargeComponent -> FarePolicyD.FareChargeComponent
 fromApiChargeComponent = \case
@@ -1511,3 +1522,4 @@ fromApiChargeComponent = \case
   Common.ReturnFeeChargeComponent -> FarePolicyD.ReturnFeeChargeComponent
   Common.BoothChargeComponent -> FarePolicyD.BoothChargeComponent
   Common.RideExtraTimeFareComponent -> FarePolicyD.RideExtraTimeFareComponent
+  Common.DriverSelectedFareComponent -> FarePolicyD.DriverSelectedFareComponent
