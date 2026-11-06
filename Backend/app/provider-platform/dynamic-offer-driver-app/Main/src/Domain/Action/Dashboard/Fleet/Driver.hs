@@ -5467,10 +5467,12 @@ postDriverFleetDriverAutoAssign merchantShortId opCity requestorId driverId mbFl
   Redis.withWaitAndLockRedisWithTimeout (SVST.selectedServiceTiersLockKey personId) 5 10 50000 $ do
     driver <- QPerson.findById personId >>= fromMaybeM (PersonDoesNotExist personId.getId)
     vehicle <- QVehicle.findById personId >>= fromMaybeM (VehicleNotFound personId.getId)
-    let tiers = FDS.vehicleAutoAcceptTiers cityTiers vehicle
     if req.enable
       then do
+        -- A fleet that doesn't let its drivers toggle force-selects the vehicle's eligible tiers, so it isn't limited to
+        -- the ones already selected.
+        tiers <- FDS.fleetAutoAssignTiers True cityTiers driver vehicle
         when (null tiers) $ throwError NoAutoAcceptTierForVehicle
         FDS.applyFleetSettings True cityTiers driver vehicle
-      else FDS.removeAutoAssign tiers driver vehicle
+      else FDS.removeAutoAssign (FDS.vehicleAutoAcceptTiers cityTiers vehicle) driver vehicle
   pure Success
