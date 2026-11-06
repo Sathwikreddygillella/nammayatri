@@ -18,12 +18,12 @@ module Domain.Types.Booking.API where
 -- TODO:Move api entity of booking to UI
 
 import qualified BecknV2.OnDemand.Enums as VehicleCategory
+import qualified BecknV2.OnDemand.FareBreakup.Core as FB
 import Data.Aeson (eitherDecode, encode)
 import Data.OpenApi (ToSchema (..), genericDeclareNamedSchema)
 import qualified Data.Text as T
 import qualified Domain.Action.UI.FareBreakup as DAFareBreakup
 import qualified Domain.Action.UI.Location as SLoc
-import Domain.SharedLogic.RideDiscount (isProjectedFareParamTag)
 import Domain.Types
 import Domain.Types.Booking
 import Domain.Types.BookingCancellationReason
@@ -48,7 +48,7 @@ import qualified Domain.Types.ServiceTierType as DVST
 import qualified Domain.Types.StopInformation as DSI
 import qualified Domain.Types.Trip as Trip
 import Domain.Types.VehicleVariant (VehicleVariant (..))
-import EulerHS.Prelude hiding (elem, find, id, length, map, notElem, null)
+import EulerHS.Prelude hiding (elem, find, id, length, map, notElem, null, sum)
 import Kernel.Beam.Functions
 import Kernel.External.Encryption (decrypt)
 import qualified Kernel.External.Payment.Interface as Payment
@@ -76,6 +76,7 @@ import qualified Safety.Storage.CachedQueries.Sos as SafetyCQSos
 import qualified Safety.Storage.Queries.Sos as SafetyQSos
 import SharedLogic.Booking (getfareBreakups)
 import qualified SharedLogic.Offer as SOffer
+import qualified SharedLogic.PaymentCharge as SPaymentCharge
 import qualified SharedLogic.Type as SLT
 import Storage.Beam.Sos ()
 import qualified Storage.CachedQueries.BppDetails as CQBPP
@@ -113,6 +114,8 @@ data BookingAPIEntity = BookingAPIEntity
     estimatedFareWithCurrency :: PriceAPIEntity,
     discountWithCurrency :: Maybe PriceAPIEntity,
     estimatedTotalFareWithCurrency :: PriceAPIEntity,
+    estimatedFarePayable :: SPaymentCharge.PayableAmount,
+    farePayable :: Maybe SPaymentCharge.PayableAmount,
     fromLocation :: LocationAPIEntity,
     initialPickupLocation :: LocationAPIEntity,
     driversPreviousRideDropLocLat :: Maybe Double,
@@ -403,6 +406,10 @@ makeBookingAPIEntity requesterId booking activeRide allRides estimatedFareBreaku
   let providerNum = fromMaybe "+91" bppDetails.supportNumber
   mbJourneyLeg <- QJL.findByLegSearchId (Just booking.transactionId)
   fleetEngineEnabled <- lookupFleetEngineEnabled booking.merchantId booking.merchantOperatingCityId
+  paymentMethods <- filter (\paymentMethod -> maybe True (== paymentMethod.paymentInstrument) booking.paymentInstrument) <$> SPaymentCharge.merchantPaymentMethods booking.merchantOperatingCityId
+  let breakupTax breakups = sum [breakup.amount.amount | breakup <- breakups, FB.isTaxTitle breakup.description]
+      estimatedFarePayable = SPaymentCharge.mkFarePayable booking.estimatedFare.currency paymentMethods (booking.estimatedFare.amount - maybe 0 (.amount) booking.discount) (breakupTax estimatedFareBreakups)
+      farePayable = (\fare -> SPaymentCharge.mkFarePayable fare.currency paymentMethods fare.amount (breakupTax fareBreakups)) <$> (activeRide >>= (.totalFare))
   return $
     BookingAPIEntity
       { id = booking.id,
@@ -417,13 +424,15 @@ makeBookingAPIEntity requesterId booking activeRide allRides estimatedFareBreaku
         estimatedFareWithCurrency = mkPriceAPIEntity booking.estimatedFare,
         discountWithCurrency = mkPriceAPIEntity <$> booking.discount,
         estimatedTotalFareWithCurrency = mkPriceAPIEntity booking.estimatedTotalFare,
+        estimatedFarePayable,
+        farePayable,
         fromLocation = SLoc.makeLocationAPIEntity booking.fromLocation,
         initialPickupLocation = SLoc.makeLocationAPIEntity booking.initialPickupLocation,
         rideList = rides,
         hasNightIssue = hasNightIssue,
         tripTerms = [],
-        estimatedFareBreakup = filter (not . isProjectedFareParamTag . (.description)) (DAFareBreakup.mkFareBreakupAPIEntity <$> estimatedFareBreakups),
-        fareBreakup = filter (not . isProjectedFareParamTag . (.description)) (DAFareBreakup.mkFareBreakupAPIEntity <$> fareBreakups),
+        estimatedFareBreakup = (DAFareBreakup.mkFareBreakupAPIEntity <$> estimatedFareBreakups),
+        fareBreakup = DAFareBreakup.mkFareBreakupAPIEntity <$> fareBreakups,
         rideScheduledTime = booking.startTime,
         returnTime = booking.returnTime,
         bookingDetails,
@@ -757,6 +766,7 @@ buildRideAPIEntity (_requesterId, booking, _isOnlinePayment) DRide.Ride {..} = d
                           isHidden = offerEntity.isHidden,
                           amountSaved = offerEntity.amountSaved,
                           postOfferAmount = offerEntity.postOfferAmount,
+                          postOfferPayable = Nothing,
                           estimatedAmountSaved = estimatedOfferEntity.amountSaved,
                           estimatedPostOfferAmount = estimatedOfferEntity.postOfferAmount,
                           offerType = Just (if offerEntity.payoutAmount > 0 then DOffer.CASHBACK else DOffer.DISCOUNT),

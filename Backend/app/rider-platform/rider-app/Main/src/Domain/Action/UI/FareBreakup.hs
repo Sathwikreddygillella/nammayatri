@@ -1,7 +1,6 @@
 module Domain.Action.UI.FareBreakup where
 
 import Data.Aeson
-import Domain.SharedLogic.RideDiscount (isProjectedFareParamTag)
 import Domain.Types.FareBreakup
 import qualified Domain.Types.Merchant as DM
 import qualified Domain.Types.Person as DP
@@ -52,6 +51,6 @@ getBookingFareBreakup _ entityId mbEntityType = do
   (fareBreakups, estimatedFareBreakups) <- getfareBreakups booking mbRide
   pure
     BookingFareBreakupRes
-      { fareBreakup = filter (not . isProjectedFareParamTag . (.description)) (mkFareBreakupAPIEntity <$> fareBreakups),
-        estimatedFareBreakup = filter (not . isProjectedFareParamTag . (.description)) (mkFareBreakupAPIEntity <$> estimatedFareBreakups)
+      { fareBreakup = mkFareBreakupAPIEntity <$> fareBreakups,
+        estimatedFareBreakup = (mkFareBreakupAPIEntity <$> estimatedFareBreakups)
       }

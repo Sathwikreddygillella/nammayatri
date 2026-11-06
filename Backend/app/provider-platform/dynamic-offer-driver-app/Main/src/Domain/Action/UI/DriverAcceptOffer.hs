@@ -63,14 +63,14 @@ import Lib.SessionizerMetrics.Types.Event (EventStreamFlow)
 import qualified Lib.Types.SpecialLocation as SL
 import qualified SharedLogic.AddOn as SAddOn
 import SharedLogic.CallBAP (sendDriverOffer)
+import qualified SharedLogic.ComponentCharge as SCC
 import SharedLogic.FareCalculator
 import qualified SharedLogic.FareCalculator as FC
 import SharedLogic.FarePolicy
 import qualified SharedLogic.ParkingFeeExemption as SPFE
-import qualified SharedLogic.ComponentCharge as SCC
-import qualified SharedLogic.RideTax as RideTax
 import SharedLogic.Pricing
 import SharedLogic.Ride
+import qualified SharedLogic.RideTax as RideTax
 import qualified SharedLogic.SearchTryLocker as CS
 import qualified SharedLogic.Type as SLT
 import qualified Storage.Cac.DriverPoolConfig as SCDPC
